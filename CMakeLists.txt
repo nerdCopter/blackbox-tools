@@ -15,28 +15,26 @@ if(WIN32 AND MSVC)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
-# Find packages using vcpkg
-find_package(PkgConfig QUIET)
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(CAIRO QUIET cairo)
-    pkg_check_modules(FREETYPE QUIET freetype2)
-endif()
-
-# Fallback to find_package for vcpkg
-if(NOT CAIRO_FOUND)
-    find_package(unofficial-cairo QUIET)
+# Find packages - vcpkg first, then pkg-config fallback
+if(WIN32 AND MSVC)
+    # Use vcpkg packages on Windows
+    find_package(unofficial-cairo CONFIG QUIET)
+    find_package(Freetype CONFIG QUIET)
+    
     if(unofficial-cairo_FOUND)
         set(CAIRO_LIBRARIES unofficial::cairo::cairo)
         set(CAIRO_FOUND TRUE)
     endif()
-endif()
-
-if(NOT FREETYPE_FOUND)
-    find_package(Freetype QUIET)
+    
     if(Freetype_FOUND)
         set(FREETYPE_LIBRARIES Freetype::Freetype)
         set(FREETYPE_FOUND TRUE)
     endif()
+else()
+    # Use pkg-config on Unix systems
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(CAIRO REQUIRED cairo)
+    pkg_check_modules(FREETYPE REQUIRED freetype2)
 endif()
 
 # Source files

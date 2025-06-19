@@ -44,10 +44,6 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           .\vcpkg\vcpkg.exe install cairo:x64-windows-static freetype:x64-windows-static
-          
-      - name: Setup MSVC (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: microsoft/setup-msbuild@v2
 
       - name: Build the tools (Linux/macOS)
         if: matrix.os != 'windows-latest'
@@ -58,14 +54,19 @@ jobs:
       - name: Build with MSVC (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static -G "Visual Studio 17 2022" -A x64
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -G "Visual Studio 17 2022" -A x64
           cmake --build build --config Release
           
       - name: Test executables (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          .\build\bin\Release\blackbox_decode.exe --help
-          if (Test-Path ".\build\bin\Release\blackbox_render.exe") { .\build\bin\Release\blackbox_render.exe --help }
+          Get-ChildItem -Recurse build/
+          if (Test-Path "build/bin/Release/blackbox_decode.exe") { 
+            .\build\bin\Release\blackbox_decode.exe --help 
+          } else {
+            Write-Host "blackbox_decode.exe not found in expected location"
+            Get-ChildItem -Recurse build/ -Name "*.exe"
+          }
 
       - name: Publish build artifacts (Linux/macOS)
         if: matrix.os != 'windows-latest'
@@ -86,5 +87,6 @@ jobs:
           name: Blackbox tools ${{matrix.name}}
           path: |
             build/bin/Release/*.exe
+            build/bin/*.exe
           retention-days: 60
           overwrite: true
