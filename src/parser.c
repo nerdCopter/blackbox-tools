@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 //For msvcrt to define M_PI:
 #define _USE_MATH_DEFINES

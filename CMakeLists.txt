@@ -13,6 +13,8 @@ if(WIN32 AND MSVC)
     
     # Add Windows-specific definitions
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-DWIN32)
+    add_definitions(-D_WIN32)
 endif()
 
 # Find packages - vcpkg first, then pkg-config fallback
