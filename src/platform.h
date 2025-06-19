@@ -27,6 +27,7 @@
     #endif
 #else
     #include <semaphore.h>
+    #include <time.h>
 #endif
 
 #ifndef WIN32
