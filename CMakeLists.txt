@@ -87,9 +87,6 @@ if(WIN32 AND MSVC)
             
         if(CAIRO_LIB AND CAIRO_INCLUDE_DIR)
             set(CAIRO_FOUND TRUE)
-            set(CAIRO_LIBRARIES ${CAIRO_LIB})
-            set(CAIRO_INCLUDE_DIRS ${CAIRO_INCLUDE_DIR})
-            message(STATUS "✓ Cairo found manually: ${CAIRO_LIB}")
             
             # Create an imported target for consistency
             add_library(cairo_manual UNKNOWN IMPORTED)
@@ -98,6 +95,9 @@ if(WIN32 AND MSVC)
                 INTERFACE_INCLUDE_DIRECTORIES ${CAIRO_INCLUDE_DIR}
             )
             set(CAIRO_LIBRARIES cairo_manual)
+            set(CAIRO_INCLUDE_DIRS ${CAIRO_INCLUDE_DIR})
+            message(STATUS "✓ Cairo found manually: ${CAIRO_LIB}")
+            message(STATUS "✓ Cairo include directory: ${CAIRO_INCLUDE_DIR}")
         endif()
     endif()
     
@@ -201,12 +201,14 @@ if(WIN32 AND MSVC)
     # Windows system libraries
     target_link_libraries(blackbox_render gdi32 user32 ole32 oleaut32 uuid)
     
-    # Add include directories if using pkg-config results
+    # CRITICAL: Add include directories explicitly for the compiler
     if(CAIRO_INCLUDE_DIRS)
         target_include_directories(blackbox_render PRIVATE ${CAIRO_INCLUDE_DIRS})
+        message(STATUS "✓ Cairo include directory set: ${CAIRO_INCLUDE_DIRS}")
     endif()
     if(FREETYPE_INCLUDE_DIRS)
         target_include_directories(blackbox_render PRIVATE ${FREETYPE_INCLUDE_DIRS})
+        message(STATUS "✓ FreeType include directory set: ${FREETYPE_INCLUDE_DIRS}")
     endif()
 else()
     # Unix systems with pkg-config
