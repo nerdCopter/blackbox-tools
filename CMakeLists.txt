@@ -210,6 +210,13 @@ if(WIN32 AND MSVC)
         target_include_directories(blackbox_render PRIVATE ${FREETYPE_INCLUDE_DIRS})
         message(STATUS "✓ FreeType include directory set: ${FREETYPE_INCLUDE_DIRS}")
     endif()
+    
+    # FALLBACK: Ensure vcpkg include directory is available 
+    set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
+    if(EXISTS ${VCPKG_INCLUDE_DIR})
+        target_include_directories(blackbox_render PRIVATE ${VCPKG_INCLUDE_DIR})
+        message(STATUS "✓ vcpkg include directory added: ${VCPKG_INCLUDE_DIR}")
+    endif()
 else()
     # Unix systems with pkg-config
     target_link_libraries(blackbox_render ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
