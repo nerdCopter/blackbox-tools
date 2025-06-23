@@ -47,34 +47,39 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           Write-Host "Installing Cairo and FreeType via vcpkg..."
-          # Install with the correct package names
+          
+          # Check what packages are available first
+          Write-Host "=== Available Cairo packages ==="
+          .\vcpkg\vcpkg.exe search cairo
+          Write-Host "=== Available FreeType packages ==="
+          .\vcpkg\vcpkg.exe search freetype
+          
+          # Install packages
           .\vcpkg\vcpkg.exe install cairo:x64-windows-static
           .\vcpkg\vcpkg.exe install freetype:x64-windows-static
           
           Write-Host "=== Installed packages ==="
           .\vcpkg\vcpkg.exe list
           
-          Write-Host "=== Checking installation paths ==="
-          $cairoPath = "vcpkg\installed\x64-windows-static\include\cairo\cairo.h"
-          $freetypePath = "vcpkg\installed\x64-windows-static\include\freetype\freetype.h"
-          
-          if (Test-Path $cairoPath) {
-            Write-Host "✓ Cairo header found at: $cairoPath"
-          } else {
-            Write-Host "❌ Cairo header not found, searching..."
-            Get-ChildItem -Recurse vcpkg\installed\ -Name "cairo.h" -ErrorAction SilentlyContinue
+          Write-Host "=== Checking CMake integration files ==="
+          $shareDir = "vcpkg\installed\x64-windows-static\share"
+          if (Test-Path $shareDir) {
+            Write-Host "Share directory contents:"
+            Get-ChildItem $shareDir | Select-Object Name
+            
+            # Look for CMake config files
+            Write-Host "Cairo CMake files:"
+            Get-ChildItem -Recurse $shareDir -Name "*cairo*" -ErrorAction SilentlyContinue
+            Write-Host "FreeType CMake files:"
+            Get-ChildItem -Recurse $shareDir -Name "*freetype*" -ErrorAction SilentlyContinue
           }
           
-          if (Test-Path $freetypePath) {
-            Write-Host "✓ FreeType header found at: $freetypePath"
-          } else {
-            Write-Host "❌ FreeType header not found, searching..."
-            Get-ChildItem -Recurse vcpkg\installed\ -Name "freetype.h" -ErrorAction SilentlyContinue
+          Write-Host "=== Checking headers ==="
+          $includeDir = "vcpkg\installed\x64-windows-static\include"
+          if (Test-Path $includeDir) {
+            Write-Host "Include directory contents:"
+            Get-ChildItem $includeDir | Select-Object Name
           }
-          
-          Write-Host "=== Available CMake files ==="
-          Get-ChildItem -Recurse vcpkg\installed\x64-windows-static\share\ -Name "*cairo*" -ErrorAction SilentlyContinue
-          Get-ChildItem -Recurse vcpkg\installed\x64-windows-static\share\ -Name "*freetype*" -ErrorAction SilentlyContinue
 
       - name: Build the tools (Linux/macOS)
         if: matrix.os != 'windows-latest'

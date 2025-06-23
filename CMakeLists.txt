@@ -17,24 +17,87 @@ if(WIN32 AND MSVC)
     add_definitions(-D_WIN32)
 endif()
 
-# Find packages - simplified and reliable approach
+# Find packages - vcpkg with fallbacks for different package names
 if(WIN32 AND MSVC)
     message(STATUS "=== Windows MSVC Build with vcpkg ===")
     
     # Set required for graphics libraries - build MUST fail if not found
     find_package(PkgConfig QUIET)
     
-    # Find Cairo - try the most common vcpkg target first
-    find_package(unofficial-cairo CONFIG REQUIRED)
-    set(CAIRO_FOUND TRUE)
-    set(CAIRO_LIBRARIES unofficial::cairo::cairo)
-    message(STATUS "✓ Cairo found: ${CAIRO_LIBRARIES}")
+    # Try to find Cairo with different possible names
+    set(CAIRO_FOUND FALSE)
     
-    # Find FreeType - try the most common vcpkg target first  
-    find_package(Freetype REQUIRED)
-    set(FREETYPE_FOUND TRUE)
-    set(FREETYPE_LIBRARIES Freetype::Freetype)
-    message(STATUS "✓ FreeType found: ${FREETYPE_LIBRARIES}")
+    # Method 1: Try unofficial-cairo (most common in vcpkg)
+    find_package(unofficial-cairo CONFIG QUIET)
+    if(unofficial-cairo_FOUND)
+        set(CAIRO_FOUND TRUE)
+        set(CAIRO_LIBRARIES unofficial::cairo::cairo)
+        message(STATUS "✓ Cairo found via unofficial-cairo: ${CAIRO_LIBRARIES}")
+    endif()
+    
+    # Method 2: Try cairo directly
+    if(NOT CAIRO_FOUND)
+        find_package(cairo CONFIG QUIET)
+        if(cairo_FOUND)
+            set(CAIRO_FOUND TRUE)
+            set(CAIRO_LIBRARIES cairo::cairo)
+            message(STATUS "✓ Cairo found via cairo: ${CAIRO_LIBRARIES}")
+        endif()
+    endif()
+    
+    # Method 3: Try PkgConfig as fallback
+    if(NOT CAIRO_FOUND AND PkgConfig_FOUND)
+        pkg_check_modules(CAIRO QUIET cairo)
+        if(CAIRO_FOUND)
+            message(STATUS "✓ Cairo found via pkg-config: ${CAIRO_LIBRARIES}")
+        endif()
+    endif()
+    
+    # Try to find FreeType with different possible names
+    set(FREETYPE_FOUND FALSE)
+    
+    # Method 1: Try official Freetype target
+    find_package(Freetype QUIET)
+    if(Freetype_FOUND)
+        set(FREETYPE_FOUND TRUE)
+        set(FREETYPE_LIBRARIES Freetype::Freetype)
+        message(STATUS "✓ FreeType found via Freetype: ${FREETYPE_LIBRARIES}")
+    endif()
+    
+    # Method 2: Try freetype directly
+    if(NOT FREETYPE_FOUND)
+        find_package(freetype CONFIG QUIET)
+        if(freetype_FOUND)
+            set(FREETYPE_FOUND TRUE)
+            set(FREETYPE_LIBRARIES freetype)
+            message(STATUS "✓ FreeType found via freetype: ${FREETYPE_LIBRARIES}")
+        endif()
+    endif()
+    
+    # Method 3: Try PkgConfig as fallback
+    if(NOT FREETYPE_FOUND AND PkgConfig_FOUND)
+        pkg_check_modules(FREETYPE QUIET freetype2)
+        if(FREETYPE_FOUND)
+            message(STATUS "✓ FreeType found via pkg-config: ${FREETYPE_LIBRARIES}")
+        endif()
+    endif()
+    
+    # Check if we found both libraries
+    if(NOT CAIRO_FOUND)
+        message(FATAL_ERROR "❌ Cairo not found! Available methods tried:
+        - unofficial-cairo (vcpkg)
+        - cairo (vcpkg)  
+        - pkg-config
+        Install via: vcpkg install cairo:x64-windows-static")
+    endif()
+    
+    if(NOT FREETYPE_FOUND)
+        message(FATAL_ERROR "❌ FreeType not found! Available methods tried:
+        - Freetype (vcpkg)
+        - freetype (vcpkg)
+        - pkg-config  
+        Install via: vcpkg install freetype:x64-windows-static")
+    endif()
     
 else()
     # Use pkg-config on Unix systems
@@ -102,9 +165,18 @@ message(STATUS "✓ blackbox_render target created")
     
 # Link graphics libraries to renderer
 if(WIN32 AND MSVC)
-    # Windows with vcpkg
+    # Windows with vcpkg - link the found targets
     target_link_libraries(blackbox_render ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
+    # Windows system libraries
     target_link_libraries(blackbox_render gdi32 user32 ole32 oleaut32 uuid)
+    
+    # Add include directories if using pkg-config results
+    if(CAIRO_INCLUDE_DIRS)
+        target_include_directories(blackbox_render PRIVATE ${CAIRO_INCLUDE_DIRS})
+    endif()
+    if(FREETYPE_INCLUDE_DIRS)
+        target_include_directories(blackbox_render PRIVATE ${FREETYPE_INCLUDE_DIRS})
+    endif()
 else()
     # Unix systems with pkg-config
     target_link_libraries(blackbox_render ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
