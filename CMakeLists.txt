@@ -17,91 +17,34 @@ if(WIN32 AND MSVC)
     add_definitions(-D_WIN32)
 endif()
 
-# Find packages - vcpkg first, then pkg-config fallback
+# Find packages - simplified and reliable approach
 if(WIN32 AND MSVC)
-    message(STATUS "=== Configuring for Windows MSVC build ===")
+    message(STATUS "=== Windows MSVC Build with vcpkg ===")
     
-    # Use vcpkg packages on Windows
+    # Set required for graphics libraries - build MUST fail if not found
     find_package(PkgConfig QUIET)
     
-    # Print vcpkg integration status
-    if(CMAKE_TOOLCHAIN_FILE)
-        message(STATUS "Using vcpkg toolchain: ${CMAKE_TOOLCHAIN_FILE}")
-        if(VCPKG_TARGET_TRIPLET)
-            message(STATUS "vcpkg target triplet: ${VCPKG_TARGET_TRIPLET}")
-        endif()
-    else()
-        message(WARNING "No vcpkg toolchain file specified!")
-    endif()
+    # Find Cairo - try the most common vcpkg target first
+    find_package(unofficial-cairo CONFIG REQUIRED)
+    set(CAIRO_FOUND TRUE)
+    set(CAIRO_LIBRARIES unofficial::cairo::cairo)
+    message(STATUS "✓ Cairo found: ${CAIRO_LIBRARIES}")
     
-    # Try multiple package discovery methods for Cairo
-    find_package(unofficial-cairo CONFIG QUIET)
-    if(NOT unofficial-cairo_FOUND)
-        find_package(cairo CONFIG QUIET)
-    endif()
-    if(NOT unofficial-cairo_FOUND AND NOT cairo_FOUND)
-        find_package(Cairo QUIET)
-    endif()
+    # Find FreeType - try the most common vcpkg target first  
+    find_package(Freetype REQUIRED)
+    set(FREETYPE_FOUND TRUE)
+    set(FREETYPE_LIBRARIES Freetype::Freetype)
+    message(STATUS "✓ FreeType found: ${FREETYPE_LIBRARIES}")
     
-    # Try multiple package discovery methods for FreeType
-    find_package(Freetype CONFIG QUIET)
-    if(NOT Freetype_FOUND)
-        find_package(freetype CONFIG QUIET)
-    endif()
-    
-    # Set Cairo variables with multiple fallbacks
-    if(unofficial-cairo_FOUND)
-        set(CAIRO_LIBRARIES unofficial::cairo::cairo)
-        set(CAIRO_FOUND TRUE)
-        message(STATUS "✓ Found Cairo via vcpkg (unofficial): ${CAIRO_LIBRARIES}")
-    elseif(cairo_FOUND)
-        set(CAIRO_LIBRARIES cairo::cairo)
-        set(CAIRO_FOUND TRUE)
-        message(STATUS "✓ Found Cairo via vcpkg (cairo::cairo): ${CAIRO_LIBRARIES}")
-    elseif(Cairo_FOUND)
-        set(CAIRO_LIBRARIES Cairo::Cairo)
-        set(CAIRO_FOUND TRUE)
-        message(STATUS "✓ Found Cairo via vcpkg (Cairo::Cairo): ${CAIRO_LIBRARIES}")
-    else()
-        # Fallback to pkg-config if available
-        if(PkgConfig_FOUND)
-            pkg_check_modules(CAIRO QUIET cairo)
-            if(CAIRO_FOUND)
-                message(STATUS "✓ Found Cairo via pkg-config: ${CAIRO_LIBRARIES}")
-            endif()
-        endif()
-        if(NOT CAIRO_FOUND)
-            message(FATAL_ERROR "❌ Cairo not found! Install via: vcpkg install cairo:x64-windows or cairo:x64-windows-static")
-        endif()
-    endif()
-    
-    # Set FreeType variables with multiple fallbacks
-    if(Freetype_FOUND)
-        set(FREETYPE_LIBRARIES Freetype::Freetype)
-        set(FREETYPE_FOUND TRUE)
-        message(STATUS "✓ Found Freetype via vcpkg (Freetype::Freetype): ${FREETYPE_LIBRARIES}")
-    elseif(freetype_FOUND)
-        set(FREETYPE_LIBRARIES freetype::freetype)
-        set(FREETYPE_FOUND TRUE)
-        message(STATUS "✓ Found Freetype via vcpkg (freetype::freetype): ${FREETYPE_LIBRARIES}")
-    else()
-        # Fallback to pkg-config if available
-        if(PkgConfig_FOUND)
-            pkg_check_modules(FREETYPE QUIET freetype2)
-            if(FREETYPE_FOUND)
-                message(STATUS "✓ Found Freetype via pkg-config: ${FREETYPE_LIBRARIES}")
-            endif()
-        endif()
-        if(NOT FREETYPE_FOUND)
-            message(FATAL_ERROR "❌ FreeType not found! Install via: vcpkg install freetype:x64-windows or freetype:x64-windows-static")
-        endif()
-    endif()
 else()
     # Use pkg-config on Unix systems
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(CAIRO REQUIRED cairo)
     pkg_check_modules(FREETYPE REQUIRED freetype2)
+    message(STATUS "✓ Unix system - using pkg-config for graphics libraries")
 endif()
+
+message(STATUS "✓ All graphics dependencies resolved - blackbox_render will be built")
 
 # Source files
 set(COMMON_SOURCES
@@ -153,69 +96,23 @@ include_directories(src)
 # Blackbox decode executable
 add_executable(blackbox_decode ${DECODER_SOURCES})
 
-# Blackbox render executable (REQUIRED - graphics libraries must be available)
-if(NOT CAIRO_FOUND OR NOT FREETYPE_FOUND)
-    message(FATAL_ERROR "❌ CRITICAL: Graphics libraries are REQUIRED for blackbox_render.exe
-    
-Cairo found: ${CAIRO_FOUND}
-FreeType found: ${FREETYPE_FOUND}
-
-To fix this issue:
-1. On Windows: Ensure vcpkg is properly integrated
-   vcpkg install cairo:x64-windows freetype:x64-windows
-   or
-   vcpkg install cairo:x64-windows-static freetype:x64-windows-static
-
-2. On Linux: sudo apt-get install libcairo2-dev libfreetype6-dev
-3. On macOS: brew install cairo freetype
-
-The build cannot continue without these dependencies.")
-endif()
-
+# Blackbox render executable - graphics libraries are required
 add_executable(blackbox_render ${RENDERER_SOURCES})
-message(STATUS "✓ blackbox_render target created successfully")
+message(STATUS "✓ blackbox_render target created")
     
 # Link graphics libraries to renderer
-if(TARGET unofficial::cairo::cairo)
-    target_link_libraries(blackbox_render unofficial::cairo::cairo)
-elseif(TARGET cairo::cairo)
-    target_link_libraries(blackbox_render cairo::cairo)
-elseif(TARGET Cairo::Cairo)
-    target_link_libraries(blackbox_render Cairo::Cairo)
-else()
-    target_link_libraries(blackbox_render ${CAIRO_LIBRARIES})
-    if(CAIRO_INCLUDE_DIRS)
-        target_include_directories(blackbox_render PRIVATE ${CAIRO_INCLUDE_DIRS})
-    endif()
-    if(CAIRO_CFLAGS_OTHER)
-        target_compile_options(blackbox_render PRIVATE ${CAIRO_CFLAGS_OTHER})
-    endif()
-endif()
-
-if(TARGET Freetype::Freetype)
-    target_link_libraries(blackbox_render Freetype::Freetype)
-elseif(TARGET freetype::freetype)
-    target_link_libraries(blackbox_render freetype::freetype)
-else()
-    target_link_libraries(blackbox_render ${FREETYPE_LIBRARIES})
-    if(FREETYPE_INCLUDE_DIRS)
-        target_include_directories(blackbox_render PRIVATE ${FREETYPE_INCLUDE_DIRS})
-    endif()
-    if(FREETYPE_CFLAGS_OTHER)
-        target_compile_options(blackbox_render PRIVATE ${FREETYPE_CFLAGS_OTHER})
-    endif()
-endif()
-
-# Windows-specific linking for renderer
 if(WIN32 AND MSVC)
-    target_link_libraries(blackbox_render 
-        gdi32 
-        user32
-        ole32 
-        oleaut32 
-        uuid
-    )
+    # Windows with vcpkg
+    target_link_libraries(blackbox_render ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
+    target_link_libraries(blackbox_render gdi32 user32 ole32 oleaut32 uuid)
+else()
+    # Unix systems with pkg-config
+    target_link_libraries(blackbox_render ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
+    target_include_directories(blackbox_render PRIVATE ${CAIRO_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS})
+    target_compile_options(blackbox_render PRIVATE ${CAIRO_CFLAGS_OTHER} ${FREETYPE_CFLAGS_OTHER})
 endif()
+
+message(STATUS "✓ blackbox_render linking configured")
 
 # Encoder testbed executable
 add_executable(encoder_testbed ${ENCODER_TESTBED_SOURCES})
