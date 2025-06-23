@@ -224,14 +224,27 @@ if(WIN32 AND MSVC)
     if(EXISTS ${VCPKG_INCLUDE_DIR})
         target_compile_options(blackbox_render PRIVATE "/I${VCPKG_INCLUDE_DIR}")
         message(STATUS "✓ Direct /I compiler flag added: /I${VCPKG_INCLUDE_DIR}")
+        
+        # Also add direct include for cairo subdirectory if it exists
+        set(CAIRO_SUBDIR "${VCPKG_INCLUDE_DIR}/cairo")
+        if(EXISTS ${CAIRO_SUBDIR})
+            target_compile_options(blackbox_render PRIVATE "/I${CAIRO_SUBDIR}")
+            message(STATUS "✓ Direct /I compiler flag for cairo subdir: /I${CAIRO_SUBDIR}")
+        endif()
     endif()
     
     # Method 4: Ensure cairo.h can be found with explicit path verification
     set(CAIRO_HEADER_FILE "${VCPKG_INCLUDE_DIR}/cairo/cairo.h")
+    set(CAIRO_HEADER_FILE_DIRECT "${VCPKG_INCLUDE_DIR}/cairo.h")
     if(EXISTS ${CAIRO_HEADER_FILE})
         message(STATUS "✓ VERIFIED: cairo.h exists at ${CAIRO_HEADER_FILE}")
+        # Also add the cairo subdirectory to includes so #include <cairo.h> works
+        target_include_directories(blackbox_render PRIVATE "${VCPKG_INCLUDE_DIR}/cairo")
+        message(STATUS "✓ Added cairo subdirectory to includes: ${VCPKG_INCLUDE_DIR}/cairo")
+    elseif(EXISTS ${CAIRO_HEADER_FILE_DIRECT})
+        message(STATUS "✓ VERIFIED: cairo.h exists directly at ${CAIRO_HEADER_FILE_DIRECT}")
     else()
-        message(FATAL_ERROR "❌ cairo.h NOT FOUND at expected location: ${CAIRO_HEADER_FILE}")
+        message(FATAL_ERROR "❌ cairo.h NOT FOUND at either location: ${CAIRO_HEADER_FILE} or ${CAIRO_HEADER_FILE_DIRECT}")
     endif()
 else()
     # Unix systems with pkg-config
