@@ -43,7 +43,10 @@ jobs:
       - name: Install static libraries (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          .\vcpkg\vcpkg.exe install cairo:x64-windows-static freetype:x64-windows-static
+          Write-Host "Installing Cairo and FreeType via vcpkg..."
+          # Try both static and dynamic versions
+          .\vcpkg\vcpkg.exe install cairo:x64-windows freetype:x64-windows cairo:x64-windows-static freetype:x64-windows-static
+          Write-Host "Installed packages:"
           .\vcpkg\vcpkg.exe list
 
       - name: Build the tools (Linux/macOS)
@@ -55,8 +58,13 @@ jobs:
       - name: Build with MSVC (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          Write-Host "Configuring with CMake..."
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -G "Visual Studio 17 2022" -A x64
+          Write-Host "Configuring with CMake (trying dynamic libs first)..."
+          try {
+            cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -G "Visual Studio 17 2022" -A x64
+          } catch {
+            Write-Host "Dynamic linking failed, trying static..."
+            cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -G "Visual Studio 17 2022" -A x64
+          }
           Write-Host "Building with CMake..."
           cmake --build build --config Release
           Write-Host "Build completed. Checking output:"
