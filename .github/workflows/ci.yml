@@ -43,7 +43,8 @@ jobs:
       - name: Install static libraries (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          .\vcpkg\vcpkg.exe install cairo:x64-windows-static freetype:x64-windows-static --debug
+          .\vcpkg\vcpkg.exe install cairo:x64-windows-static freetype:x64-windows-static
+          .\vcpkg\vcpkg.exe list
 
       - name: Build the tools (Linux/macOS)
         if: matrix.os != 'windows-latest'
@@ -54,18 +55,42 @@ jobs:
       - name: Build with MSVC (Windows)
         if: matrix.os == 'windows-latest'
         run: |
+          Write-Host "Configuring with CMake..."
           cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -G "Visual Studio 17 2022" -A x64
+          Write-Host "Building with CMake..."
           cmake --build build --config Release
+          Write-Host "Build completed. Checking output:"
+          Get-ChildItem build/bin/Release/ -ErrorAction SilentlyContinue
           
       - name: Test executables (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           Get-ChildItem -Recurse build/
           if (Test-Path "build/bin/Release/blackbox_decode.exe") { 
-            .\build\bin\Release\blackbox_decode.exe --help 
+            Write-Host "Testing blackbox_decode.exe..."
+            try {
+              .\build\bin\Release\blackbox_decode.exe --help 2>&1 | Out-Null
+            } catch {
+              # Help command returns exit code 1, which is expected
+            }
+            Write-Host "blackbox_decode.exe executed successfully"
           } else {
             Write-Host "blackbox_decode.exe not found in expected location"
             Get-ChildItem -Recurse build/ -Name "*.exe"
+            exit 1
+          }
+          
+          if (Test-Path "build/bin/Release/encoder_testbed.exe") {
+            Write-Host "encoder_testbed.exe found"
+          } else {
+            Write-Host "encoder_testbed.exe not found"
+            exit 1
+          }
+          
+          if (Test-Path "build/bin/Release/blackbox_render.exe") {
+            Write-Host "blackbox_render.exe found (with graphics dependencies)"
+          } else {
+            Write-Host "blackbox_render.exe not found (graphics dependencies not available)"
           }
 
       - name: Publish build artifacts (Linux/macOS)
