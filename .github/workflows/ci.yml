@@ -39,15 +39,34 @@ jobs:
         run: |
           git clone https://github.com/microsoft/vcpkg.git
           .\vcpkg\bootstrap-vcpkg.bat
+          # Integrate vcpkg globally
+          .\vcpkg\vcpkg.exe integrate install
           
-      - name: Install static libraries (Windows)
+      - name: Install graphics libraries (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          Write-Host "Installing Cairo and FreeType via vcpkg..."
-          # Try both static and dynamic versions
-          .\vcpkg\vcpkg.exe install cairo:x64-windows freetype:x64-windows cairo:x64-windows-static freetype:x64-windows-static
-          Write-Host "Installed packages:"
-          .\vcpkg\vcpkg.exe list
+          Write-Host "Installing graphics dependencies via vcpkg..."
+          # Install both static and dynamic versions for maximum compatibility
+          .\vcpkg\vcpkg.exe install cairo:x64-windows freetype:x64-windows --recurse
+          .\vcpkg\vcpkg.exe install cairo:x64-windows-static freetype:x64-windows-static --recurse
+          
+          Write-Host "Verifying installations..."
+          .\vcpkg\vcpkg.exe list | findstr -i cairo
+          .\vcpkg\vcpkg.exe list | findstr -i freetype
+          
+          Write-Host "Checking package files..."
+          if (Test-Path "vcpkg\installed\x64-windows\include\cairo") {
+            Write-Host "✓ Cairo headers found (dynamic)"
+          }
+          if (Test-Path "vcpkg\installed\x64-windows-static\include\cairo") {
+            Write-Host "✓ Cairo headers found (static)"
+          }
+          if (Test-Path "vcpkg\installed\x64-windows\include\freetype") {
+            Write-Host "✓ FreeType headers found (dynamic)"
+          }
+          if (Test-Path "vcpkg\installed\x64-windows-static\include\freetype") {
+            Write-Host "✓ FreeType headers found (static)"
+          }
 
       - name: Build the tools (Linux/macOS)
         if: matrix.os != 'windows-latest'
@@ -58,48 +77,82 @@ jobs:
       - name: Build with MSVC (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          Write-Host "Configuring with CMake (trying dynamic libs first)..."
-          try {
-            cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -G "Visual Studio 17 2022" -A x64
-          } catch {
-            Write-Host "Dynamic linking failed, trying static..."
-            cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -G "Visual Studio 17 2022" -A x64
+          Write-Host "Configuring with CMake..."
+          $env:CMAKE_PREFIX_PATH = "${{ github.workspace }}\vcpkg\installed\x64-windows;${{ github.workspace }}\vcpkg\installed\x64-windows-static"
+          
+          # Try dynamic linking first
+          cmake -B build-dynamic -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+          
+          Write-Host "Building with CMake (dynamic)..."
+          cmake --build build-dynamic --config Release
+          
+          # Check if blackbox_render was built
+          if (Test-Path "build-dynamic/bin/Release/blackbox_render.exe") {
+            Write-Host "✓ blackbox_render.exe built successfully with dynamic linking"
+            Copy-Item -Path "build-dynamic/bin" -Destination "build" -Recurse -Force
+          } else {
+            Write-Host "Dynamic linking failed, trying static linking..."
+            cmake -B build-static -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+            cmake --build build-static --config Release
+            
+            if (Test-Path "build-static/bin/Release/blackbox_render.exe") {
+              Write-Host "✓ blackbox_render.exe built successfully with static linking"
+              Copy-Item -Path "build-static/bin" -Destination "build" -Recurse -Force
+            } else {
+              Write-Host "❌ CRITICAL: blackbox_render.exe could not be built with either dynamic or static linking"
+              Write-Host "CMake configuration logs:"
+              Get-Content "build-dynamic/CMakeFiles/CMakeConfigureLog.yaml" -ErrorAction SilentlyContinue
+              exit 1
+            }
           }
-          Write-Host "Building with CMake..."
-          cmake --build build --config Release
-          Write-Host "Build completed. Checking output:"
+          
+          Write-Host "Final build output:"
           Get-ChildItem build/bin/Release/ -ErrorAction SilentlyContinue
           
       - name: Test executables (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          Get-ChildItem -Recurse build/
+          Write-Host "Verifying all required executables..."
+          
+          # Test blackbox_decode.exe
           if (Test-Path "build/bin/Release/blackbox_decode.exe") { 
-            Write-Host "Testing blackbox_decode.exe..."
+            Write-Host "✓ blackbox_decode.exe found"
             try {
               .\build\bin\Release\blackbox_decode.exe --help 2>&1 | Out-Null
             } catch {
               # Help command returns exit code 1, which is expected
             }
-            Write-Host "blackbox_decode.exe executed successfully"
+            Write-Host "✓ blackbox_decode.exe executed successfully"
           } else {
-            Write-Host "blackbox_decode.exe not found in expected location"
-            Get-ChildItem -Recurse build/ -Name "*.exe"
+            Write-Host "❌ blackbox_decode.exe not found"
             exit 1
           }
           
+          # Test encoder_testbed.exe
           if (Test-Path "build/bin/Release/encoder_testbed.exe") {
-            Write-Host "encoder_testbed.exe found"
+            Write-Host "✓ encoder_testbed.exe found"
           } else {
-            Write-Host "encoder_testbed.exe not found"
+            Write-Host "❌ encoder_testbed.exe not found"
             exit 1
           }
           
+          # Test blackbox_render.exe (REQUIRED)
           if (Test-Path "build/bin/Release/blackbox_render.exe") {
-            Write-Host "blackbox_render.exe found (with graphics dependencies)"
+            Write-Host "✓ blackbox_render.exe found (CRITICAL COMPONENT)"
+            try {
+              .\build\bin\Release\blackbox_render.exe --help 2>&1 | Out-Null
+            } catch {
+              # Help command returns exit code 1, which is expected
+            }
+            Write-Host "✓ blackbox_render.exe executed successfully"
           } else {
-            Write-Host "blackbox_render.exe not found (graphics dependencies not available)"
+            Write-Host "❌ CRITICAL FAILURE: blackbox_render.exe not found"
+            Write-Host "This is a required component and the build must fail without it"
+            Get-ChildItem -Recurse build/ -Name "*.exe" -ErrorAction SilentlyContinue
+            exit 1
           }
+          
+          Write-Host "✅ All required executables found and tested successfully"
 
       - name: Publish build artifacts (Linux/macOS)
         if: matrix.os != 'windows-latest'
