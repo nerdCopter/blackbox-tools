@@ -72,7 +72,36 @@ if(WIN32 AND MSVC)
         endif()
     endforeach()
     
-    # Method 2: Try PkgConfig as fallback
+    # Method 3: Manual setup if libraries exist but CMake targets don't work
+    if(NOT CAIRO_FOUND)
+        message(STATUS "Trying manual Cairo setup...")
+        
+        # Look for Cairo libraries directly
+        find_library(CAIRO_LIB NAMES cairo libcairo
+            PATHS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/lib"
+            NO_DEFAULT_PATH)
+            
+        find_path(CAIRO_INCLUDE_DIR cairo/cairo.h
+            PATHS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include"
+            NO_DEFAULT_PATH)
+            
+        if(CAIRO_LIB AND CAIRO_INCLUDE_DIR)
+            set(CAIRO_FOUND TRUE)
+            set(CAIRO_LIBRARIES ${CAIRO_LIB})
+            set(CAIRO_INCLUDE_DIRS ${CAIRO_INCLUDE_DIR})
+            message(STATUS "✓ Cairo found manually: ${CAIRO_LIB}")
+            
+            # Create an imported target for consistency
+            add_library(cairo_manual UNKNOWN IMPORTED)
+            set_target_properties(cairo_manual PROPERTIES
+                IMPORTED_LOCATION ${CAIRO_LIB}
+                INTERFACE_INCLUDE_DIRECTORIES ${CAIRO_INCLUDE_DIR}
+            )
+            set(CAIRO_LIBRARIES cairo_manual)
+        endif()
+    endif()
+    
+    # Method 4: Try PkgConfig as final fallback
     if(NOT CAIRO_FOUND)
         find_package(PkgConfig QUIET)
         if(PkgConfig_FOUND)
