@@ -54,31 +54,67 @@ jobs:
           Write-Host "=== Available FreeType packages ==="
           .\vcpkg\vcpkg.exe search freetype
           
-          # Install packages
-          .\vcpkg\vcpkg.exe install cairo:x64-windows-static
+          # Install packages - try the exact package names
+          Write-Host "=== Installing FreeType ==="
           .\vcpkg\vcpkg.exe install freetype:x64-windows-static
           
-          Write-Host "=== Installed packages ==="
+          Write-Host "=== Installing Cairo ==="
+          .\vcpkg\vcpkg.exe install cairo:x64-windows-static
+          
+          # Also try installing pixman (Cairo dependency) explicitly
+          Write-Host "=== Installing Pixman (Cairo dependency) ==="
+          .\vcpkg\vcpkg.exe install pixman:x64-windows-static
+          
+          Write-Host "=== Final package list ==="
           .\vcpkg\vcpkg.exe list
           
           Write-Host "=== Checking CMake integration files ==="
           $shareDir = "vcpkg\installed\x64-windows-static\share"
           if (Test-Path $shareDir) {
             Write-Host "Share directory contents:"
-            Get-ChildItem $shareDir | Select-Object Name
+            Get-ChildItem $shareDir | Select-Object Name | Format-Wide -Column 4
             
-            # Look for CMake config files
-            Write-Host "Cairo CMake files:"
-            Get-ChildItem -Recurse $shareDir -Name "*cairo*" -ErrorAction SilentlyContinue
-            Write-Host "FreeType CMake files:"
-            Get-ChildItem -Recurse $shareDir -Name "*freetype*" -ErrorAction SilentlyContinue
+            # Look for specific CMake config files
+            Write-Host "=== Looking for Cairo CMake files ==="
+            $cairoShareDirs = Get-ChildItem $shareDir -Name "*cairo*" -ErrorAction SilentlyContinue
+            if ($cairoShareDirs) {
+              foreach ($dir in $cairoShareDirs) {
+                Write-Host "Found Cairo directory: $dir"
+                Get-ChildItem "$shareDir\$dir" -Name "*.cmake" -ErrorAction SilentlyContinue
+              }
+            } else {
+              Write-Host "❌ No Cairo directories found in share/"
+            }
+            
+            Write-Host "=== Looking for FreeType CMake files ==="
+            $freetypeShareDirs = Get-ChildItem $shareDir -Name "*freetype*" -ErrorAction SilentlyContinue
+            if ($freetypeShareDirs) {
+              foreach ($dir in $freetypeShareDirs) {
+                Write-Host "Found FreeType directory: $dir"
+                Get-ChildItem "$shareDir\$dir" -Name "*.cmake" -ErrorAction SilentlyContinue
+              }
+            }
           }
           
           Write-Host "=== Checking headers ==="
           $includeDir = "vcpkg\installed\x64-windows-static\include"
           if (Test-Path $includeDir) {
             Write-Host "Include directory contents:"
-            Get-ChildItem $includeDir | Select-Object Name
+            Get-ChildItem $includeDir | Select-Object Name | Format-Wide -Column 4
+            
+            # Check for specific header files
+            if (Test-Path "$includeDir\cairo") {
+              Write-Host "✓ Cairo headers found"
+              Get-ChildItem "$includeDir\cairo" | Select-Object Name
+            } else {
+              Write-Host "❌ Cairo headers not found"
+            }
+            
+            if (Test-Path "$includeDir\freetype") {
+              Write-Host "✓ FreeType headers found"
+            } else {
+              Write-Host "❌ FreeType headers not found"  
+            }
           }
 
       - name: Build the tools (Linux/macOS)
