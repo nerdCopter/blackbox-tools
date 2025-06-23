@@ -201,7 +201,10 @@ if(WIN32 AND MSVC)
     # Windows system libraries
     target_link_libraries(blackbox_render gdi32 user32 ole32 oleaut32 uuid)
     
-    # CRITICAL: Add include directories explicitly for the compiler
+    # CRITICAL FIX: Set include directories multiple ways to ensure MSVC finds headers
+    set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
+    
+    # Method 1: Standard include directories
     if(CAIRO_INCLUDE_DIRS)
         target_include_directories(blackbox_render PRIVATE ${CAIRO_INCLUDE_DIRS})
         message(STATUS "✓ Cairo include directory set: ${CAIRO_INCLUDE_DIRS}")
@@ -211,11 +214,24 @@ if(WIN32 AND MSVC)
         message(STATUS "✓ FreeType include directory set: ${FREETYPE_INCLUDE_DIRS}")
     endif()
     
-    # FALLBACK: Ensure vcpkg include directory is available 
-    set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
+    # Method 2: Direct vcpkg include path (not as external)
     if(EXISTS ${VCPKG_INCLUDE_DIR})
         target_include_directories(blackbox_render PRIVATE ${VCPKG_INCLUDE_DIR})
-        message(STATUS "✓ vcpkg include directory added: ${VCPKG_INCLUDE_DIR}")
+        message(STATUS "✓ vcpkg include directory added as PRIVATE: ${VCPKG_INCLUDE_DIR}")
+    endif()
+    
+    # Method 3: Force compiler flags for includes (bypass external issue)
+    if(EXISTS ${VCPKG_INCLUDE_DIR})
+        target_compile_options(blackbox_render PRIVATE "/I${VCPKG_INCLUDE_DIR}")
+        message(STATUS "✓ Direct /I compiler flag added: /I${VCPKG_INCLUDE_DIR}")
+    endif()
+    
+    # Method 4: Ensure cairo.h can be found with explicit path verification
+    set(CAIRO_HEADER_FILE "${VCPKG_INCLUDE_DIR}/cairo/cairo.h")
+    if(EXISTS ${CAIRO_HEADER_FILE})
+        message(STATUS "✓ VERIFIED: cairo.h exists at ${CAIRO_HEADER_FILE}")
+    else()
+        message(FATAL_ERROR "❌ cairo.h NOT FOUND at expected location: ${CAIRO_HEADER_FILE}")
     endif()
 else()
     # Unix systems with pkg-config
