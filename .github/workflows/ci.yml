@@ -123,47 +123,36 @@ jobs:
       - name: Test executables (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          Write-Host "Verifying all required executables..."
+          Write-Host "=== Testing all executables ==="
           
-          # Test blackbox_decode.exe
-          if (Test-Path "build/bin/Release/blackbox_decode.exe") { 
-            Write-Host "✓ blackbox_decode.exe found"
-            try {
-              .\build\bin\Release\blackbox_decode.exe --help 2>&1 | Out-Null
-            } catch {
-              # Help command returns exit code 1, which is expected
+          $exes = @("blackbox_decode.exe", "encoder_testbed.exe", "blackbox_render.exe")
+          $allFound = $true
+          
+          foreach ($exe in $exes) {
+            $path = "build\bin\Release\$exe"
+            if (Test-Path $path) {
+              $size = [math]::Round((Get-Item $path).Length / 1KB, 1)
+              Write-Host "✓ $exe found ($size KB)"
+              
+              # Test execution (help commands typically return exit code 1)
+              try {
+                & $path --help 2>&1 | Out-Null
+                Write-Host "  ✓ $exe executes successfully"
+              } catch {
+                Write-Host "  ✓ $exe executed (help command)"
+              }
+            } else {
+              Write-Host "❌ $exe MISSING - CRITICAL FAILURE"
+              $allFound = $false
             }
-            Write-Host "✓ blackbox_decode.exe executed successfully"
-          } else {
-            Write-Host "❌ blackbox_decode.exe not found"
+          }
+          
+          if (-not $allFound) {
+            Write-Host "=== BUILD FAILED: Required executables missing ==="
             exit 1
           }
           
-          # Test encoder_testbed.exe
-          if (Test-Path "build/bin/Release/encoder_testbed.exe") {
-            Write-Host "✓ encoder_testbed.exe found"
-          } else {
-            Write-Host "❌ encoder_testbed.exe not found"
-            exit 1
-          }
-          
-          # Test blackbox_render.exe (REQUIRED)
-          if (Test-Path "build/bin/Release/blackbox_render.exe") {
-            Write-Host "✓ blackbox_render.exe found (CRITICAL COMPONENT)"
-            try {
-              .\build\bin\Release\blackbox_render.exe --help 2>&1 | Out-Null
-            } catch {
-              # Help command returns exit code 1, which is expected
-            }
-            Write-Host "✓ blackbox_render.exe executed successfully"
-          } else {
-            Write-Host "❌ CRITICAL FAILURE: blackbox_render.exe not found"
-            Write-Host "This is a required component and the build must fail without it"
-            Get-ChildItem -Recurse build/ -Name "*.exe" -ErrorAction SilentlyContinue
-            exit 1
-          }
-          
-          Write-Host "✅ All required executables found and tested successfully"
+          Write-Host "✅ ALL EXECUTABLES BUILT AND TESTED SUCCESSFULLY"
 
       - name: Publish build artifacts (Linux/macOS)
         if: matrix.os != 'windows-latest'
