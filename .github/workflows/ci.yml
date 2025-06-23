@@ -95,14 +95,31 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-static `
             -G "Visual Studio 17 2022" -A x64 `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_VERBOSE_MAKEFILE=ON
+            -DCMAKE_BUILD_TYPE=Release
+          
+          Write-Host "=== Configuration completed, checking for build files ==="
+          if (Test-Path "build/ALL_BUILD.vcxproj") {
+            Write-Host "✓ Visual Studio project files generated successfully"
+          } else {
+            Write-Host "❌ Project files not generated - CMake configuration failed"
+            Write-Host "=== CMake Error Log ==="
+            Get-Content "build/CMakeFiles/CMakeError.log" -ErrorAction SilentlyContinue
+            Write-Host "=== CMake Output Log ==="  
+            Get-Content "build/CMakeFiles/CMakeOutput.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
           
           Write-Host "=== Building ==="
           cmake --build build --config Release --verbose
           
           Write-Host "=== Build Results ==="
-          Get-ChildItem build/bin/Release/ -ErrorAction SilentlyContinue | Format-Table Name, Length
+          if (Test-Path "build/bin/Release/") {
+            Get-ChildItem build/bin/Release/ -ErrorAction SilentlyContinue | Format-Table Name, Length
+          } else {
+            Write-Host "❌ Build output directory not created"
+            # Check for alternative output locations
+            Get-ChildItem -Recurse build/ -Name "*.exe" -ErrorAction SilentlyContinue
+          }
           
           # Verify all required executables
           $requiredExes = @("blackbox_decode.exe", "encoder_testbed.exe", "blackbox_render.exe")
@@ -118,10 +135,11 @@ jobs:
           # If blackbox_render.exe is missing, show detailed error info
           if (!(Test-Path "build/bin/Release/blackbox_render.exe")) {
             Write-Host "=== DEBUGGING blackbox_render.exe build failure ==="
-            Write-Host "Build log:"
-            Get-Content "build/CMakeFiles/blackbox_render.dir/Release/blackbox_render.log" -ErrorAction SilentlyContinue
-            Write-Host "CMake Error Log:"
-            Get-Content "build/CMakeFiles/CMakeError.log" -ErrorAction SilentlyContinue
+            Write-Host "MSBuild logs:"
+            Get-ChildItem -Recurse build/ -Name "*.log" | ForEach-Object { 
+              Write-Host "--- $_ ---"
+              Get-Content $_ -ErrorAction SilentlyContinue | Select-Object -Last 20
+            }
             exit 1
           }
           
