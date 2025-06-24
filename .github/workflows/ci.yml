@@ -36,85 +36,31 @@ jobs:
 
       - name: Setup vcpkg (Windows)
         if: matrix.os == 'windows-latest'
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          .\bootstrap-vcpkg.bat
-          .\vcpkg.exe integrate install
-          cd ..
+        uses: lukka/run-vcpkg@v11
+        with:
+          runVcpkgInstall: true
+          vcpkgGitCommitId: 'master'
           
       - name: Install graphics libraries (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          Write-Host "Installing Cairo and FreeType via vcpkg..."
+          Write-Host "Installing graphics dependencies via vcpkg..."
+          .\vcpkg\vcpkg.exe install freetype:x64-windows-static cairo:x64-windows-static pixman:x64-windows-static
           
-          # Check what packages are available first
-          Write-Host "=== Available Cairo packages ==="
-          .\vcpkg\vcpkg.exe search cairo
-          Write-Host "=== Available FreeType packages ==="
-          .\vcpkg\vcpkg.exe search freetype
-          
-          # Install packages - try the exact package names
-          Write-Host "=== Installing FreeType ==="
-          .\vcpkg\vcpkg.exe install freetype:x64-windows-static
-          
-          Write-Host "=== Installing Cairo ==="
-          .\vcpkg\vcpkg.exe install cairo:x64-windows-static
-          
-          # Also try installing pixman (Cairo dependency) explicitly
-          Write-Host "=== Installing Pixman (Cairo dependency) ==="
-          .\vcpkg\vcpkg.exe install pixman:x64-windows-static
-          
-          Write-Host "=== Final package list ==="
+          Write-Host "=== Verifying installation ==="
           .\vcpkg\vcpkg.exe list
           
-          Write-Host "=== Checking CMake integration files ==="
-          $shareDir = "vcpkg\installed\x64-windows-static\share"
-          if (Test-Path $shareDir) {
-            Write-Host "Share directory contents:"
-            Get-ChildItem $shareDir | Select-Object Name | Format-Wide -Column 4
-            
-            # Look for specific CMake config files
-            Write-Host "=== Looking for Cairo CMake files ==="
-            $cairoShareDirs = Get-ChildItem $shareDir -Name "*cairo*" -ErrorAction SilentlyContinue
-            if ($cairoShareDirs) {
-              foreach ($dir in $cairoShareDirs) {
-                Write-Host "Found Cairo directory: $dir"
-                Get-ChildItem "$shareDir\$dir" -Name "*.cmake" -ErrorAction SilentlyContinue
-              }
-            } else {
-              Write-Host "❌ No Cairo directories found in share/"
-            }
-            
-            Write-Host "=== Looking for FreeType CMake files ==="
-            $freetypeShareDirs = Get-ChildItem $shareDir -Name "*freetype*" -ErrorAction SilentlyContinue
-            if ($freetypeShareDirs) {
-              foreach ($dir in $freetypeShareDirs) {
-                Write-Host "Found FreeType directory: $dir"
-                Get-ChildItem "$shareDir\$dir" -Name "*.cmake" -ErrorAction SilentlyContinue
-              }
-            }
-          }
-          
-          Write-Host "=== Checking headers ==="
+          # Quick header verification
           $includeDir = "vcpkg\installed\x64-windows-static\include"
-          if (Test-Path $includeDir) {
-            Write-Host "Include directory contents:"
-            Get-ChildItem $includeDir | Select-Object Name | Format-Wide -Column 4
-            
-            # Check for specific header files
-            if (Test-Path "$includeDir\cairo") {
-              Write-Host "✓ Cairo headers found"
-              Get-ChildItem "$includeDir\cairo" | Select-Object Name
-            } else {
-              Write-Host "❌ Cairo headers not found"
-            }
-            
-            if (Test-Path "$includeDir\freetype") {
-              Write-Host "✓ FreeType headers found"
-            } else {
-              Write-Host "❌ FreeType headers not found"  
-            }
+          if (Test-Path "$includeDir\cairo\cairo.h") {
+            Write-Host "✓ Cairo headers found"
+          } else {
+            Write-Host "❌ Cairo headers missing"
+          }
+          if (Test-Path "$includeDir\freetype") {
+            Write-Host "✓ FreeType headers found"
+          } else {
+            Write-Host "❌ FreeType headers missing"
           }
 
       - name: Build the tools (Linux/macOS)

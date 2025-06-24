@@ -7,9 +7,6 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Set static linking for Windows MSVC
 if(WIN32 AND MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MT")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
     
     # Add Windows-specific definitions
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
@@ -196,34 +193,43 @@ message(STATUS "✓ blackbox_render target created")
     
 # Link graphics libraries to renderer
 if(WIN32 AND MSVC)
-    # Collect all libraries first, then link in one consolidated call
+    # Use modern CMake targets where possible
     set(ALL_CAIRO_LIBS ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
     set(ALL_SYSTEM_LIBS gdi32 user32 ole32 oleaut32 uuid)
     
-    # Add standard vcpkg libraries that were found during configuration
+    # Add standard vcpkg libraries using modern targets
     find_package(ZLIB REQUIRED)
     find_package(BZip2 REQUIRED)
     find_package(PNG REQUIRED)
     find_package(EXPAT REQUIRED)
     
-    # Only add libraries that were actually found
-    if(ZLIB_FOUND AND ZLIB_LIBRARIES)
+    # Use imported targets when available, fallback to legacy variables
+    if(TARGET ZLIB::ZLIB)
+        list(APPEND ALL_CAIRO_LIBS ZLIB::ZLIB)
+    elseif(ZLIB_FOUND AND ZLIB_LIBRARIES)
         list(APPEND ALL_CAIRO_LIBS ${ZLIB_LIBRARIES})
     endif()
-    if(BZIP2_FOUND AND BZIP2_LIBRARIES)
+    
+    if(TARGET BZip2::BZip2)
+        list(APPEND ALL_CAIRO_LIBS BZip2::BZip2)
+    elseif(BZIP2_FOUND AND BZIP2_LIBRARIES)
         list(APPEND ALL_CAIRO_LIBS ${BZIP2_LIBRARIES})
     endif()
-    if(PNG_FOUND AND PNG_LIBRARIES)
+    
+    if(TARGET PNG::PNG)
+        list(APPEND ALL_CAIRO_LIBS PNG::PNG)
+    elseif(PNG_FOUND AND PNG_LIBRARIES)
         list(APPEND ALL_CAIRO_LIBS ${PNG_LIBRARIES})
     endif()
-    if(EXPAT_FOUND AND EXPAT_LIBRARIES)
+    
+    if(TARGET expat::expat)
+        list(APPEND ALL_CAIRO_LIBS expat::expat)
+    elseif(EXPAT_FOUND AND EXPAT_LIBRARIES)
         list(APPEND ALL_CAIRO_LIBS ${EXPAT_LIBRARIES})
     endif()
     
-    # CRITICAL FIX: Set include directories multiple ways to ensure MSVC finds headers
-    set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
-    
-    # Method 1: Standard include directories
+    # Configure include directories using proper CMake targets
+    # The imported targets (Cairo::Cairo, Freetype::Freetype) should already provide correct include paths
     if(CAIRO_INCLUDE_DIRS)
         target_include_directories(blackbox_render PRIVATE ${CAIRO_INCLUDE_DIRS})
         message(STATUS "✓ Cairo include directory set: ${CAIRO_INCLUDE_DIRS}")
@@ -233,33 +239,11 @@ if(WIN32 AND MSVC)
         message(STATUS "✓ FreeType include directory set: ${FREETYPE_INCLUDE_DIRS}")
     endif()
     
-    # Method 2: Direct vcpkg include path (not as external)
-    if(EXISTS ${VCPKG_INCLUDE_DIR})
-        target_include_directories(blackbox_render PRIVATE ${VCPKG_INCLUDE_DIR})
-        message(STATUS "✓ vcpkg include directory added as PRIVATE: ${VCPKG_INCLUDE_DIR}")
-    endif()
-    
-    # Method 3: Force compiler flags for includes (bypass external issue)
-    if(EXISTS ${VCPKG_INCLUDE_DIR})
-        target_compile_options(blackbox_render PRIVATE "/I${VCPKG_INCLUDE_DIR}")
-        message(STATUS "✓ Direct /I compiler flag added: /I${VCPKG_INCLUDE_DIR}")
-        
-        # Also add direct include for cairo subdirectory if it exists
-        set(CAIRO_SUBDIR "${VCPKG_INCLUDE_DIR}/cairo")
-        if(EXISTS ${CAIRO_SUBDIR})
-            target_compile_options(blackbox_render PRIVATE "/I${CAIRO_SUBDIR}")
-            message(STATUS "✓ Direct /I compiler flag for cairo subdir: /I${CAIRO_SUBDIR}")
-        endif()
-    endif()
-    
-    # Method 4: Ensure cairo.h can be found with explicit path verification
+    # Verify Cairo header availability
+    set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
     set(CAIRO_HEADER_FILE "${VCPKG_INCLUDE_DIR}/cairo/cairo.h")
-    set(CAIRO_HEADER_FILE_DIRECT "${VCPKG_INCLUDE_DIR}/cairo.h")
     if(EXISTS ${CAIRO_HEADER_FILE})
         message(STATUS "✓ VERIFIED: cairo.h exists at ${CAIRO_HEADER_FILE}")
-        # Also add the cairo subdirectory to includes so #include <cairo.h> works
-        target_include_directories(blackbox_render PRIVATE "${VCPKG_INCLUDE_DIR}/cairo")
-        message(STATUS "✓ Added cairo subdirectory to includes: ${VCPKG_INCLUDE_DIR}/cairo")
         
         # Collect additional static linking dependencies
         set(ADDITIONAL_CAIRO_LIBS)
