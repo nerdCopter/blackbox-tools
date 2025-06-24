@@ -148,6 +148,13 @@ jobs:
           Write-Host "=== Building ==="
           cmake --build build --config Release --verbose
           
+          # Check if build succeeded by looking for any compilation errors
+          $buildExitCode = $LASTEXITCODE
+          if ($buildExitCode -ne 0) {
+            Write-Host "❌ Build failed with exit code: $buildExitCode"
+            Write-Host "=== MSBuild Error Details ==="
+          }
+          
           Write-Host "=== Build Results ==="
           if (Test-Path "build/bin/Release/") {
             Get-ChildItem build/bin/Release/ -ErrorAction SilentlyContinue | Format-Table Name, Length
@@ -171,11 +178,15 @@ jobs:
           # If blackbox_render.exe is missing, show detailed error info
           if (!(Test-Path "build/bin/Release/blackbox_render.exe")) {
             Write-Host "=== DEBUGGING blackbox_render.exe build failure ==="
+            Write-Host "Checking for any built executables:"
+            Get-ChildItem -Recurse build/ -Name "*.exe" -ErrorAction SilentlyContinue
             Write-Host "MSBuild logs:"
             Get-ChildItem -Recurse build/ -Name "*.log" | ForEach-Object { 
               Write-Host "--- $_ ---"
-              Get-Content $_ -ErrorAction SilentlyContinue | Select-Object -Last 20
+              Get-Content $_ -ErrorAction SilentlyContinue | Select-Object -Last 30
             }
+            Write-Host "=== CMake Cache variables ==="
+            Get-Content "build/CMakeCache.txt" | Select-String "CAIRO|FREETYPE|PNG|ZLIB" | Select-Object -First 20
             exit 1
           }
           
