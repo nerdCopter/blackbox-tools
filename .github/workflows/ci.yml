@@ -204,12 +204,28 @@ jobs:
               $size = [math]::Round((Get-Item $path).Length / 1KB, 1)
               Write-Host "✓ $exe found ($size KB)"
               
-              # Test execution (help commands typically return exit code 1)
+              # Test execution (help commands typically return exit code 1 or -1)
+              $output = ""
+              $errorOutput = ""
               try {
-                & $path --help 2>&1 | Out-Null
-                Write-Host "  ✓ $exe executes successfully"
+                $process = Start-Process -FilePath $path -ArgumentList "--help" -PassThru -Wait -NoNewWindow -RedirectStandardOutput "temp_stdout.txt" -RedirectStandardError "temp_stderr.txt"
+                $output = Get-Content "temp_stdout.txt" -Raw -ErrorAction SilentlyContinue
+                $errorOutput = Get-Content "temp_stderr.txt" -Raw -ErrorAction SilentlyContinue
+                Remove-Item "temp_stdout.txt", "temp_stderr.txt" -ErrorAction SilentlyContinue
+                
+                # Check if the executable ran and produced expected output
+                if ($output -match "Usage" -or $errorOutput -match "Usage" -or $process.ExitCode -eq 1 -or $process.ExitCode -eq -1) {
+                  Write-Host "  ✓ $exe executes successfully (exit code: $($process.ExitCode))"
+                } else {
+                  Write-Host "  ❌ $exe unexpected exit code: $($process.ExitCode)"
+                  Write-Host "  Stdout: $output"
+                  Write-Host "  Stderr: $errorOutput"
+                  $allFound = $false
+                }
               } catch {
-                Write-Host "  ✓ $exe executed (help command)"
+                Write-Host "  ❌ $exe FAILED TO START: $($_.Exception.Message)"
+                Write-Host "  This indicates a DLL dependency issue"
+                $allFound = $false
               }
             } else {
               Write-Host "❌ $exe MISSING - CRITICAL FAILURE"
