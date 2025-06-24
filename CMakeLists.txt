@@ -204,8 +204,9 @@ if(WIN32 AND MSVC)
     find_package(ZLIB REQUIRED)
     find_package(BZip2 REQUIRED)
     find_package(PNG REQUIRED)
+    find_package(EXPAT REQUIRED)
     
-    list(APPEND ALL_CAIRO_LIBS ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES} ${PNG_LIBRARIES})
+    list(APPEND ALL_CAIRO_LIBS ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES} ${PNG_LIBRARIES} ${EXPAT_LIBRARIES})
     
     # CRITICAL FIX: Set include directories multiple ways to ensure MSVC finds headers
     set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
@@ -285,18 +286,8 @@ if(WIN32 AND MSVC)
                 message(STATUS "⚠ FontConfig library not found, may cause linking issues")
             endif()
             
-            # Expat library (required by FontConfig)
-            find_library(EXPAT_LIBRARY 
-                NAMES expat
-                PATHS ${VCPKG_LIB_DIR}
-                NO_DEFAULT_PATH
-            )
-            if(EXPAT_LIBRARY)
-                list(APPEND ADDITIONAL_CAIRO_LIBS ${EXPAT_LIBRARY})
-                message(STATUS "✓ Expat library found: ${EXPAT_LIBRARY}")
-            else()
-                message(STATUS "⚠ Expat library not found, may cause linking issues")
-            endif()
+            # Expat is already found via find_package(EXPAT REQUIRED) above
+            message(STATUS "✓ Expat library found: ${EXPAT_LIBRARIES}")
             
             # Add additional libraries to the main list
             list(APPEND ALL_CAIRO_LIBS ${ADDITIONAL_CAIRO_LIBS})
