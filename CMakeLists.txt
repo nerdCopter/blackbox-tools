@@ -196,10 +196,12 @@ message(STATUS "✓ blackbox_render target created")
     
 # Link graphics libraries to renderer
 if(WIN32 AND MSVC)
-    # Windows with vcpkg - link the found targets
-    target_link_libraries(blackbox_render ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
-    # Windows system libraries
-    target_link_libraries(blackbox_render gdi32 user32 ole32 oleaut32 uuid)
+    # Windows with vcpkg - link the found targets and system libraries (consolidated for consistency)
+    target_link_libraries(blackbox_render PRIVATE 
+        ${CAIRO_LIBRARIES} 
+        ${FREETYPE_LIBRARIES}
+        gdi32 user32 ole32 oleaut32 uuid
+    )
     
     # CRITICAL FIX: Set include directories multiple ways to ensure MSVC finds headers
     set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
@@ -261,8 +263,11 @@ if(WIN32 AND MSVC)
                 PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib
                 NO_DEFAULT_PATH
             )
+            # Collect all additional libraries for a single link command
+            set(ADDITIONAL_CAIRO_LIBS)
+            
             if(PIXMAN_LIBRARY)
-                target_link_libraries(blackbox_render PRIVATE ${PIXMAN_LIBRARY})
+                list(APPEND ADDITIONAL_CAIRO_LIBS ${PIXMAN_LIBRARY})
                 message(STATUS "✓ Pixman library found: ${PIXMAN_LIBRARY}")
             else()
                 message(STATUS "⚠ Pixman library not found, may cause linking issues")
@@ -275,7 +280,7 @@ if(WIN32 AND MSVC)
                 NO_DEFAULT_PATH
             )
             if(FONTCONFIG_LIBRARY)
-                target_link_libraries(blackbox_render PRIVATE ${FONTCONFIG_LIBRARY})
+                list(APPEND ADDITIONAL_CAIRO_LIBS ${FONTCONFIG_LIBRARY})
                 message(STATUS "✓ FontConfig library found: ${FONTCONFIG_LIBRARY}")
             else()
                 message(STATUS "⚠ FontConfig library not found, may cause linking issues")
@@ -288,14 +293,15 @@ if(WIN32 AND MSVC)
                 NO_DEFAULT_PATH
             )
             if(EXPAT_LIBRARY)
-                target_link_libraries(blackbox_render PRIVATE ${EXPAT_LIBRARY})
+                list(APPEND ADDITIONAL_CAIRO_LIBS ${EXPAT_LIBRARY})
                 message(STATUS "✓ Expat library found: ${EXPAT_LIBRARY}")
             else()
                 message(STATUS "⚠ Expat library not found, may cause linking issues")
             endif()
             
-            # Additional Windows system libraries for Cairo
+            # Link all additional Cairo dependencies and Windows system libraries in one call
             target_link_libraries(blackbox_render PRIVATE 
+                ${ADDITIONAL_CAIRO_LIBS}
                 gdi32 user32 ole32 oleaut32 uuid
             )
             message(STATUS "✓ Windows system libraries added for Cairo")
@@ -305,7 +311,7 @@ if(WIN32 AND MSVC)
     endif()
 else()
     # Unix systems with pkg-config
-    target_link_libraries(blackbox_render ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
+    target_link_libraries(blackbox_render PRIVATE ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
     target_include_directories(blackbox_render PRIVATE ${CAIRO_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS})
     target_compile_options(blackbox_render PRIVATE ${CAIRO_CFLAGS_OTHER} ${FREETYPE_CFLAGS_OTHER})
 endif()
