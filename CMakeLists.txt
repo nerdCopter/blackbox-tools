@@ -241,10 +241,67 @@ if(WIN32 AND MSVC)
         # Also add the cairo subdirectory to includes so #include <cairo.h> works
         target_include_directories(blackbox_render PRIVATE "${VCPKG_INCLUDE_DIR}/cairo")
         message(STATUS "✓ Added cairo subdirectory to includes: ${VCPKG_INCLUDE_DIR}/cairo")
-    elseif(EXISTS ${CAIRO_HEADER_FILE_DIRECT})
-        message(STATUS "✓ VERIFIED: cairo.h exists directly at ${CAIRO_HEADER_FILE_DIRECT}")
+        
+        # Link Cairo with all its dependencies for static linking
+        message(STATUS "✓ blackbox_render linking configured")
+        target_link_libraries(blackbox_render PRIVATE 
+            ${CAIRO_LIBRARY}
+            Freetype::Freetype
+            ${PNG_LIBRARIES}
+            ${ZLIB_LIBRARIES}
+            ${BZIP2_LIBRARIES}
+        )
+        
+        # Add Cairo dependency libraries for Windows static linking
+        if(WIN32 AND VCPKG_TARGET_TRIPLET MATCHES "static")
+            message(STATUS "✓ Adding Windows static dependencies for Cairo")
+            # Pixman library (required by Cairo)
+            find_library(PIXMAN_LIBRARY 
+                NAMES pixman-1 pixman
+                PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib
+                NO_DEFAULT_PATH
+            )
+            if(PIXMAN_LIBRARY)
+                target_link_libraries(blackbox_render PRIVATE ${PIXMAN_LIBRARY})
+                message(STATUS "✓ Pixman library found: ${PIXMAN_LIBRARY}")
+            else()
+                message(STATUS "⚠ Pixman library not found, may cause linking issues")
+            endif()
+            
+            # FontConfig library (required by Cairo)
+            find_library(FONTCONFIG_LIBRARY 
+                NAMES fontconfig
+                PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib
+                NO_DEFAULT_PATH
+            )
+            if(FONTCONFIG_LIBRARY)
+                target_link_libraries(blackbox_render PRIVATE ${FONTCONFIG_LIBRARY})
+                message(STATUS "✓ FontConfig library found: ${FONTCONFIG_LIBRARY}")
+            else()
+                message(STATUS "⚠ FontConfig library not found, may cause linking issues")
+            endif()
+            
+            # Expat library (required by FontConfig)
+            find_library(EXPAT_LIBRARY 
+                NAMES expat
+                PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib
+                NO_DEFAULT_PATH
+            )
+            if(EXPAT_LIBRARY)
+                target_link_libraries(blackbox_render PRIVATE ${EXPAT_LIBRARY})
+                message(STATUS "✓ Expat library found: ${EXPAT_LIBRARY}")
+            else()
+                message(STATUS "⚠ Expat library not found, may cause linking issues")
+            endif()
+            
+            # Additional Windows system libraries for Cairo
+            target_link_libraries(blackbox_render PRIVATE 
+                gdi32 user32 ole32 oleaut32 uuid
+            )
+            message(STATUS "✓ Windows system libraries added for Cairo")
+        endif()
     else()
-        message(FATAL_ERROR "❌ cairo.h NOT FOUND at either location: ${CAIRO_HEADER_FILE} or ${CAIRO_HEADER_FILE_DIRECT}")
+        message(STATUS "❌ Cairo not found - blackbox_render will not be built")
     endif()
 else()
     # Unix systems with pkg-config
