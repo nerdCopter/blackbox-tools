@@ -196,12 +196,16 @@ message(STATUS "✓ blackbox_render target created")
     
 # Link graphics libraries to renderer
 if(WIN32 AND MSVC)
-    # Windows with vcpkg - link the found targets and system libraries (consolidated for consistency)
-    target_link_libraries(blackbox_render PRIVATE 
-        ${CAIRO_LIBRARIES} 
-        ${FREETYPE_LIBRARIES}
-        gdi32 user32 ole32 oleaut32 uuid
-    )
+    # Collect all libraries first, then link in one consolidated call
+    set(ALL_CAIRO_LIBS ${CAIRO_LIBRARIES} ${FREETYPE_LIBRARIES})
+    set(ALL_SYSTEM_LIBS gdi32 user32 ole32 oleaut32 uuid)
+    
+    # Add standard vcpkg libraries that were found during configuration
+    find_package(ZLIB REQUIRED)
+    find_package(BZip2 REQUIRED)
+    find_package(PNG REQUIRED)
+    
+    list(APPEND ALL_CAIRO_LIBS ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES} ${PNG_LIBRARIES})
     
     # CRITICAL FIX: Set include directories multiple ways to ensure MSVC finds headers
     set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
@@ -244,27 +248,22 @@ if(WIN32 AND MSVC)
         target_include_directories(blackbox_render PRIVATE "${VCPKG_INCLUDE_DIR}/cairo")
         message(STATUS "✓ Added cairo subdirectory to includes: ${VCPKG_INCLUDE_DIR}/cairo")
         
-        # Link Cairo with all its dependencies for static linking
-        message(STATUS "✓ blackbox_render linking configured")
-        target_link_libraries(blackbox_render PRIVATE 
-            ${CAIRO_LIBRARY}
-            Freetype::Freetype
-            ${PNG_LIBRARIES}
-            ${ZLIB_LIBRARIES}
-            ${BZIP2_LIBRARIES}
-        )
+        # Collect additional static linking dependencies
+        set(ADDITIONAL_CAIRO_LIBS)
         
         # Add Cairo dependency libraries for Windows static linking
         if(WIN32 AND VCPKG_TARGET_TRIPLET MATCHES "static")
             message(STATUS "✓ Adding Windows static dependencies for Cairo")
+            
+            # Set the correct vcpkg library path
+            set(VCPKG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/lib")
+            
             # Pixman library (required by Cairo)
             find_library(PIXMAN_LIBRARY 
                 NAMES pixman-1 pixman
-                PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib
+                PATHS ${VCPKG_LIB_DIR}
                 NO_DEFAULT_PATH
             )
-            # Collect all additional libraries for a single link command
-            set(ADDITIONAL_CAIRO_LIBS)
             
             if(PIXMAN_LIBRARY)
                 list(APPEND ADDITIONAL_CAIRO_LIBS ${PIXMAN_LIBRARY})
@@ -276,7 +275,7 @@ if(WIN32 AND MSVC)
             # FontConfig library (required by Cairo)
             find_library(FONTCONFIG_LIBRARY 
                 NAMES fontconfig
-                PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib
+                PATHS ${VCPKG_LIB_DIR}
                 NO_DEFAULT_PATH
             )
             if(FONTCONFIG_LIBRARY)
@@ -289,7 +288,7 @@ if(WIN32 AND MSVC)
             # Expat library (required by FontConfig)
             find_library(EXPAT_LIBRARY 
                 NAMES expat
-                PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib
+                PATHS ${VCPKG_LIB_DIR}
                 NO_DEFAULT_PATH
             )
             if(EXPAT_LIBRARY)
@@ -299,13 +298,16 @@ if(WIN32 AND MSVC)
                 message(STATUS "⚠ Expat library not found, may cause linking issues")
             endif()
             
-            # Link all additional Cairo dependencies and Windows system libraries in one call
-            target_link_libraries(blackbox_render PRIVATE 
-                ${ADDITIONAL_CAIRO_LIBS}
-                gdi32 user32 ole32 oleaut32 uuid
-            )
+            # Add additional libraries to the main list
+            list(APPEND ALL_CAIRO_LIBS ${ADDITIONAL_CAIRO_LIBS})
             message(STATUS "✓ Windows system libraries added for Cairo")
         endif()
+        
+        # SINGLE CONSOLIDATED LINKING CALL - all libraries at once
+        target_link_libraries(blackbox_render PRIVATE 
+            ${ALL_CAIRO_LIBS}
+            ${ALL_SYSTEM_LIBS}
+        )
     else()
         message(STATUS "❌ Cairo not found - blackbox_render will not be built")
     endif()
