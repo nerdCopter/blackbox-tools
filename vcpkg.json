@@ -1,0 +1,27 @@
+{
+  "name": "blackbox-tools",
+  "version": "1.0.0",
+  "description": "Blackbox flight data recorder tools for processing flight logs",
+  "homepage": "https://github.com/betaflight/blackbox-tools",
+  "dependencies": [
+    {
+      "name": "cairo",
+      "default-features": false,
+      "features": ["freetype", "fontconfig"]
+    },
+    {
+      "name": "freetype",
+      "default-features": false
+    },
+    {
+      "name": "pixman",
+      "default-features": false
+    }
+  ],
+  "overrides": [
+    {
+      "name": "cairo",
+      "version": "1.18.0"
+    }
+  ]
+}
