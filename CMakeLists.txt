@@ -78,12 +78,12 @@ if(WIN32 AND MSVC)
         
         # Look for Cairo libraries directly
         find_library(CAIRO_LIB NAMES cairo libcairo
-            PATHS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/lib"
-            NO_DEFAULT_PATH)
+           PATHS "${VCPKG_ROOT}/installed/x64-windows-static/lib" "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/lib"
+           NO_DEFAULT_PATH)
             
         find_path(CAIRO_INCLUDE_DIR cairo/cairo.h
-            PATHS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include"
-            NO_DEFAULT_PATH)
+           PATHS "${VCPKG_ROOT}/installed/x64-windows-static/include" "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include"
+           NO_DEFAULT_PATH)
             
         if(CAIRO_LIB AND CAIRO_INCLUDE_DIR)
             set(CAIRO_FOUND TRUE)
@@ -221,7 +221,7 @@ if(WIN32 AND MSVC)
     endif()
     
     # CRITICAL FIX: Set include directories multiple ways to ensure MSVC finds headers
-    set(VCPKG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/include")
+    set(VCPKG_INCLUDE_DIR "${VCPKG_ROOT}/installed/x64-windows-static/include")
     
     # Method 1: Standard include directories
     if(CAIRO_INCLUDE_DIRS)
@@ -269,7 +269,7 @@ if(WIN32 AND MSVC)
             message(STATUS "✓ Adding Windows static dependencies for Cairo")
             
             # Set the correct vcpkg library path
-            set(VCPKG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-windows-static/lib")
+            set(VCPKG_LIB_DIR "${VCPKG_ROOT}/installed/x64-windows-static/lib")
             
             # Pixman library (required by Cairo)
             find_library(PIXMAN_LIBRARY 
