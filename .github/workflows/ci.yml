@@ -20,18 +20,18 @@ jobs:
             os: windows-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y libcairo2-dev libfreetype6-dev pkg-config
-      
+
       - name: Install macOS dependencies
         if: matrix.os == 'macos-latest'
         run: |
           brew install cairo freetype pkg-config
-      
+
       - name: Setup vcpkg (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -40,7 +40,7 @@ jobs:
           .\bootstrap-vcpkg.bat
           echo "VCPKG_ROOT=${{ github.workspace }}\vcpkg" >> $env:GITHUB_ENV
           echo "CMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
-      
+
       - name: Install vcpkg packages (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -53,7 +53,7 @@ jobs:
           .\vcpkg.exe install zlib:x64-windows-static
           .\vcpkg.exe install bzip2:x64-windows-static
           .\vcpkg.exe install libpng:x64-windows-static
-      
+
       - name: Configure CMake
         run: |
           mkdir build
@@ -64,12 +64,12 @@ jobs:
             cmake .. -DCMAKE_BUILD_TYPE=Release
           fi
         shell: bash
-      
+
       - name: Build
         run: |
           cd build
           cmake --build . --config Release
-      
+
       - name: Test executables
         run: |
           cd build
@@ -85,15 +85,13 @@ jobs:
             ./bin/blackbox_render --help || echo "blackbox_render runs"
           fi
         shell: bash
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Blackbox tools ${{ matrix.name }}
           path: |
             build/bin/
-    steps:
-      - uses: actions/checkout@v4
 
       - name: Install dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -114,38 +112,38 @@ jobs:
           .\bootstrap-vcpkg.bat
           .\vcpkg.exe integrate install
           cd ..
-          
+
       - name: Install graphics libraries (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           Write-Host "Installing Cairo and FreeType via vcpkg..."
-          
+
           # Check what packages are available first
           Write-Host "=== Available Cairo packages ==="
           .\vcpkg\vcpkg.exe search cairo
           Write-Host "=== Available FreeType packages ==="
           .\vcpkg\vcpkg.exe search freetype
-          
+
           # Install packages - try the exact package names
           Write-Host "=== Installing FreeType ==="
           .\vcpkg\vcpkg.exe install freetype:x64-windows-static
-          
+
           Write-Host "=== Installing Cairo ==="
           .\vcpkg\vcpkg.exe install cairo:x64-windows-static
-          
+
           # Also try installing pixman (Cairo dependency) explicitly
           Write-Host "=== Installing Pixman (Cairo dependency) ==="
           .\vcpkg\vcpkg.exe install pixman:x64-windows-static
-          
+
           Write-Host "=== Final package list ==="
           .\vcpkg\vcpkg.exe list
-          
+
           Write-Host "=== Checking CMake integration files ==="
           $shareDir = "vcpkg\installed\x64-windows-static\share"
           if (Test-Path $shareDir) {
             Write-Host "Share directory contents:"
             Get-ChildItem $shareDir | Select-Object Name | Format-Wide -Column 4
-            
+
             # Look for specific CMake config files
             Write-Host "=== Looking for Cairo CMake files ==="
             $cairoShareDirs = Get-ChildItem $shareDir -Name "*cairo*" -ErrorAction SilentlyContinue
@@ -157,7 +155,7 @@ jobs:
             } else {
               Write-Host "❌ No Cairo directories found in share/"
             }
-            
+
             Write-Host "=== Looking for FreeType CMake files ==="
             $freetypeShareDirs = Get-ChildItem $shareDir -Name "*freetype*" -ErrorAction SilentlyContinue
             if ($freetypeShareDirs) {
@@ -167,13 +165,13 @@ jobs:
               }
             }
           }
-          
+
           Write-Host "=== Checking headers ==="
           $includeDir = "vcpkg\installed\x64-windows-static\include"
           if (Test-Path $includeDir) {
             Write-Host "Include directory contents:"
             Get-ChildItem $includeDir | Select-Object Name | Format-Wide -Column 4
-            
+
             # Check for specific header files
             if (Test-Path "$includeDir\cairo") {
               Write-Host "✓ Cairo headers found"
@@ -181,11 +179,11 @@ jobs:
             } else {
               Write-Host "❌ Cairo headers not found"
             }
-            
+
             if (Test-Path "$includeDir\freetype") {
               Write-Host "✓ FreeType headers found"
             } else {
-              Write-Host "❌ FreeType headers not found"  
+              Write-Host "❌ FreeType headers not found"
             }
           }
 
@@ -204,7 +202,7 @@ jobs:
             -DVCPKG_TARGET_TRIPLET=x64-windows-static `
             -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=Release
-          
+
           Write-Host "=== Configuration completed, checking for build files ==="
           if (Test-Path "build/ALL_BUILD.vcxproj") {
             Write-Host "✓ Visual Studio project files generated successfully"
@@ -212,21 +210,21 @@ jobs:
             Write-Host "❌ Project files not generated - CMake configuration failed"
             Write-Host "=== CMake Error Log ==="
             Get-Content "build/CMakeFiles/CMakeError.log" -ErrorAction SilentlyContinue
-            Write-Host "=== CMake Output Log ==="  
+            Write-Host "=== CMake Output Log ==="
             Get-Content "build/CMakeFiles/CMakeOutput.log" -ErrorAction SilentlyContinue
             exit 1
           }
-          
+
           Write-Host "=== Building ==="
           cmake --build build --config Release --verbose
-          
+
           # Check if build succeeded by looking for any compilation errors
           $buildExitCode = $LASTEXITCODE
           if ($buildExitCode -ne 0) {
             Write-Host "❌ Build failed with exit code: $buildExitCode"
             Write-Host "=== MSBuild Error Details ==="
           }
-          
+
           Write-Host "=== Build Results ==="
           if (Test-Path "build/bin/Release/") {
             Get-ChildItem build/bin/Release/ -ErrorAction SilentlyContinue | Format-Table Name, Length
@@ -235,7 +233,7 @@ jobs:
             # Check for alternative output locations
             Get-ChildItem -Recurse build/ -Name "*.exe" -ErrorAction SilentlyContinue
           }
-          
+
           # Verify all required executables
           $requiredExes = @("blackbox_decode.exe", "encoder_testbed.exe", "blackbox_render.exe")
           foreach ($exe in $requiredExes) {
@@ -246,14 +244,14 @@ jobs:
               Write-Host "❌ $exe MISSING"
             }
           }
-          
+
           # If blackbox_render.exe is missing, show detailed error info
           if (!(Test-Path "build/bin/Release/blackbox_render.exe")) {
             Write-Host "=== DEBUGGING blackbox_render.exe build failure ==="
             Write-Host "Checking for any built executables:"
             Get-ChildItem -Recurse build/ -Name "*.exe" -ErrorAction SilentlyContinue
             Write-Host "MSBuild logs:"
-            Get-ChildItem -Recurse build/ -Name "*.log" | ForEach-Object { 
+            Get-ChildItem -Recurse build/ -Name "*.log" | ForEach-Object {
               Write-Host "--- $_ ---"
               Get-Content $_ -ErrorAction SilentlyContinue | Select-Object -Last 30
             }
@@ -261,21 +259,21 @@ jobs:
             Get-Content "build/CMakeCache.txt" | Select-String "CAIRO|FREETYPE|PNG|ZLIB" | Select-Object -First 20
             exit 1
           }
-          
+
       - name: Test executables (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           Write-Host "=== Testing all executables ==="
-          
+
           $exes = @("blackbox_decode.exe", "encoder_testbed.exe", "blackbox_render.exe")
           $allFound = $true
-          
+
           foreach ($exe in $exes) {
             $path = "build\bin\Release\$exe"
             if (Test-Path $path) {
               $size = [math]::Round((Get-Item $path).Length / 1KB, 1)
               Write-Host "✓ $exe found ($size KB)"
-              
+
               # Test execution (help commands typically return exit code 1 or -1)
               $output = ""
               $errorOutput = ""
@@ -284,7 +282,7 @@ jobs:
                 $output = Get-Content "temp_stdout.txt" -Raw -ErrorAction SilentlyContinue
                 $errorOutput = Get-Content "temp_stderr.txt" -Raw -ErrorAction SilentlyContinue
                 Remove-Item "temp_stdout.txt", "temp_stderr.txt" -ErrorAction SilentlyContinue
-                
+
                 # Check if the executable ran and produced expected output
                 if ($output -match "Usage" -or $errorOutput -match "Usage" -or $process.ExitCode -eq 1 -or $process.ExitCode -eq -1) {
                   Write-Host "  ✓ $exe executes successfully (exit code: $($process.ExitCode))"
@@ -304,12 +302,12 @@ jobs:
               $allFound = $false
             }
           }
-          
+
           if (-not $allFound) {
             Write-Host "=== BUILD FAILED: Required executables missing ==="
             exit 1
           }
-          
+
           Write-Host "✅ ALL EXECUTABLES BUILT AND TESTED SUCCESSFULLY"
 
       - name: Publish build artifacts (Linux/macOS)
