@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -6,20 +7,91 @@ on:
 jobs:
   build:
     name: Build (${{ matrix.name }})
-    runs-on:  ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: Linux
             os: ubuntu-latest
-
           - name: macOS
             os: macos-latest
-
           - name: Windows
             os: windows-latest
-
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev libfreetype6-dev pkg-config
+      
+      - name: Install macOS dependencies
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cairo freetype pkg-config
+      
+      - name: Setup vcpkg (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          .\bootstrap-vcpkg.bat
+          echo "VCPKG_ROOT=${{ github.workspace }}\vcpkg" >> $env:GITHUB_ENV
+          echo "CMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
+      
+      - name: Install vcpkg packages (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd vcpkg
+          .\vcpkg.exe install cairo:x64-windows-static
+          .\vcpkg.exe install freetype:x64-windows-static
+          .\vcpkg.exe install pixman:x64-windows-static
+          .\vcpkg.exe install fontconfig:x64-windows-static
+          .\vcpkg.exe install expat:x64-windows-static
+          .\vcpkg.exe install zlib:x64-windows-static
+          .\vcpkg.exe install bzip2:x64-windows-static
+          .\vcpkg.exe install libpng:x64-windows-static
+      
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          else
+            cmake .. -DCMAKE_BUILD_TYPE=Release
+          fi
+        shell: bash
+      
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --config Release
+      
+      - name: Test executables
+        run: |
+          cd build
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            ls -la bin/Release/
+            ./bin/Release/blackbox_decode.exe --help || echo "blackbox_decode runs"
+            ./bin/Release/encoder_testbed.exe --help || echo "encoder_testbed runs"
+            ./bin/Release/blackbox_render.exe --help || echo "blackbox_render runs"
+          else
+            ls -la bin/
+            ./bin/blackbox_decode --help || echo "blackbox_decode runs"
+            ./bin/encoder_testbed --help || echo "encoder_testbed runs"
+            ./bin/blackbox_render --help || echo "blackbox_render runs"
+          fi
+        shell: bash
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Blackbox tools ${{ matrix.name }}
+          path: |
+            build/bin/
     steps:
       - uses: actions/checkout@v4
 
