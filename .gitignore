@@ -9,3 +9,7 @@
 
 /visual-studio/.vs/
 /.vs/
+
+# CMake build artifacts
+CMakeCache.txt
+CMakeFiles/

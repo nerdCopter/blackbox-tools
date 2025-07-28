@@ -43,10 +43,10 @@ ifneq (,$(IS_WINDOWS))
 	FREETYPE_LDFLAGS := 
 else
 	# Unix-like systems - use pkg-config
-	CAIRO_CFLAGS    := $(shell pkg-config --cflags cairo)
-	CAIRO_LDFLAGS   := $(shell pkg-config --libs cairo)
-	FREETYPE_CFLAGS := $(shell pkg-config --cflags freetype2)
-	FREETYPE_LDFLAGS := $(shell pkg-config --libs freetype2)
+	CAIRO_CFLAGS    := $(shell command -v pkg-config >/dev/null 2>&1 && pkg-config --cflags cairo)
+	CAIRO_LDFLAGS   := $(shell command -v pkg-config >/dev/null 2>&1 && pkg-config --libs cairo)
+	FREETYPE_CFLAGS := $(shell command -v pkg-config >/dev/null 2>&1 && pkg-config  --cflags freetype2)
+	FREETYPE_LDFLAGS := $(shell command -v pkg-config >/dev/null 2>&1 && pkg-config  --libs freetype2)
 endif
 
 # Source files common to all targets
