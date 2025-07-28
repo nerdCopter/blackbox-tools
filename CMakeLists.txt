@@ -27,9 +27,14 @@ if(WIN32 AND MSVC)
         message(STATUS "✓ FreeType found via Freetype: ${FREETYPE_LIBRARIES}")
     else()
         find_package(freetype CONFIG QUIET)
-        if(FREETYPE_FOUND)
+        if(freetype_FOUND)
             set(FREETYPE_FOUND TRUE)
-            set(FREETYPE_LIBRARIES freetype)
+            # Prefer the imported target if it exists, otherwise fall back
+            if(TARGET freetype::freetype)
+                set(FREETYPE_LIBRARIES freetype::freetype)
+            else()
+                set(FREETYPE_LIBRARIES freetype)
+            endif()
             message(STATUS "✓ FreeType found via freetype: ${FREETYPE_LIBRARIES}")
         endif()
     endif()
@@ -187,7 +192,7 @@ include_directories(src)
 # Blackbox decode executable
 add_executable(blackbox_decode ${DECODER_SOURCES})
 
-if(CAIRO_FOUND AND (Freetype_FOUND OR freetype_FOUND))
+if(CAIRO_FOUND AND FREETYPE_FOUND)
   add_executable(blackbox_render ${RENDERER_SOURCES})
   message(STATUS "✓ blackbox_render target created")
 else()
@@ -339,9 +344,13 @@ else()
 endif()
 
 # Set output directory
-set_target_properties(blackbox_decode encoder_testbed blackbox_render PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
+set_target_properties(blackbox_decode encoder_testbed PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+if(TARGET blackbox_render)
+    set_target_properties(blackbox_render PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+endif(
 
 # Version information
 if(BLACKBOX_VERSION)
